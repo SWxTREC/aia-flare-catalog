@@ -1,0 +1,3 @@
+{"seed": 10001, 
+"labels_file": "/home/kiva6588/Code/aia_flares_catalog_7_updated.csv", 
+"output_dir": "ert_results/seed10001/"}

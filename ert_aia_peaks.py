@@ -58,8 +58,7 @@ def generateTrainValidData(df,config,cols,label_col):
     valid_flares_M = flares_M[split_train_M:split_valid_M]
     train_flares_X = flares_X[:split_train_X]
     valid_flares_X = flares_X[split_train_X:split_valid_X]
-    # train_flares = train_flares_C.append(train_flares_M).append(train_flares_X)
-    # valid_flares = valid_flares_C.append(valid_flares_M).append(valid_flares_X)
+
     train_flares = np.concatenate([train_flares_C,train_flares_M,train_flares_X])
     valid_flares = np.concatenate([valid_flares_C,valid_flares_M,valid_flares_X])
     df_train = df[df['goes_flare_ind'].isin(train_flares)] 
@@ -95,11 +94,8 @@ def generateTrainValidData(df,config,cols,label_col):
     df_test = df_new
 
     df_train = df_train.replace([np.inf, -np.inf, np.nan], 0)
-    # df_train = df_train.dropna()
     df_valid = df_valid.replace([np.inf, -np.inf, np.nan], 0)
-    # df_valid = df_valid.dropna()
     df_test = df_test.replace([np.inf, -np.inf , np.nan], 0)
-    # df_test = df_test.dropna()
 
     print('Number of C/M/X flares in training set: ',len(train_flares_C),'/',len(train_flares_M),'/',len(train_flares_X))
     print('Number of C/M/X flares in valid set: ',len(valid_flares_C),'/',len(valid_flares_M),'/',len(valid_flares_X))
@@ -119,18 +115,22 @@ def main():
     impurity = 0.00004
     df = pd.read_csv(config['labels_file'])
     label_col = 'flare'
-    feature_cols = ['LAT_FWT','LON_FWT','AREA_ACR','USFLUXL','MEANGAM','MEANGBT','MEANGBZ','MEANGBH','MEANJZD','TOTUSJZ','MEANALP','MEANJZH','ABSNJZH','SAVNCPP','MEANPOT','TOTPOT','MEANSHR','SHRGT45','R_VALUE','NACR','SIZE_ACR','SIZE']
-    lams = ['193','171','304','1600','131','94']
-    # feature_cols = []
-    # for lam in lams:
-    #     feature_cols.append(lam+'_magnitude')
-    #     df.rename(columns = {lam+'_prominence':lam+'_rel_magnitude'},inplace=True)
-    #     feature_cols.append(lam+'_rel_magnitude')
-    #     feature_cols.append(lam+'_est_size')
-    #     df[lam+'_duration'] = (pd.to_datetime(df[lam+'_end_time'])-pd.to_datetime(df[lam+'_start_time'])).dt.total_seconds()
-    #     feature_cols.append(lam+'_duration')
-    # feature_cols.append('Nx')
-    # feature_cols.append('Ny')
+    lams = ['193','171','304','1600','131','94']   
+
+    if config['features'] == 'hmi' or config['features'] == 'hmiandaia':
+        feature_cols = ['LAT_FWT','LON_FWT','AREA_ACR','USFLUXL','MEANGAM','MEANGBT','MEANGBZ','MEANGBH','MEANJZD','TOTUSJZ','MEANALP','MEANJZH','ABSNJZH','SAVNCPP','MEANPOT','TOTPOT','MEANSHR','SHRGT45','R_VALUE','NACR','SIZE_ACR','SIZE']
+    elif config['features'] == 'aia':
+        feature_cols = []
+    if config['features'] == 'hmiandaia' or config['features'] == 'aia':
+        for lam in lams:
+            feature_cols.append(lam+'_magnitude')
+            df.rename(columns = {lam+'_prominence':lam+'_rel_magnitude'},inplace=True)
+            feature_cols.append(lam+'_rel_magnitude')
+            feature_cols.append(lam+'_est_size')
+            df[lam+'_duration'] = (pd.to_datetime(df[lam+'_end_time'])-pd.to_datetime(df[lam+'_start_time'])).dt.total_seconds()
+            feature_cols.append(lam+'_duration')
+        feature_cols.append('Nx')
+        feature_cols.append('Ny')
 
     X_train,y_train,X_valid,y_valid,X_test,y_test = generateTrainValidData(df,config,feature_cols,label_col)
 

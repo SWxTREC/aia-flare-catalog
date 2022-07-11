@@ -1,3 +1,1 @@
-{"seed": 10001, 
-"labels_file": "/home/kiva6588/Code/aia_flares_catalog_7_updated.csv", 
-"output_dir": "ert_results/seed10001/"}
+{"seed": 1001, "labels_file": "aia_flares_catalog_verified.csv", "output_dir": "ert_results_hmi/seed1001/", "features": "hmi"}

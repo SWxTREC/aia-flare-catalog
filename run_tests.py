@@ -17,7 +17,7 @@ for seed in seeds:
     print('Running test with seed ', seed)
     config['features'] = features
     config["seed"] = int(seed)
-    config["labels_file"] = '/home/kiva6588/Code/aia_flares_catalog_7_updated.csv'
+    config["labels_file"] = 'aia_flares_catalog_verified.csv'
     config["output_dir"] = 'ert_results_'+features+'/seed'+str(seed)+'/'
 
     if not os.path.exists(config["output_dir"]):
@@ -43,7 +43,7 @@ for seed in seeds:
             data[feature] = [importance]
 
 df = pd.DataFrame(data)
-df.to_csv(config["output_dir"]+'ert_results_'+features+'_7.csv',index=False)
+df.to_csv(config["output_dir"]+'ert_results_'+features+'_verified.csv',index=False)
 
     
 

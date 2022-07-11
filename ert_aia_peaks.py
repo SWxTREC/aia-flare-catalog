@@ -15,7 +15,7 @@ import re
 import random
 from sklearn.model_selection import GridSearchCV
 import json
-from xgboost import XGBRegressor
+#from xgboost import XGBRegressor
 
 
 def predict(ralphie,X,y):
@@ -90,7 +90,7 @@ def generateTrainValidData(df,config,cols,label_col):
     data = scaler.transform(data)
     df_new = pd.DataFrame(data, columns=[x for x in cols])
     df_new.insert(loc=0, column='SHARP', value=df_test['SHARP'].values)
-    df_new.insert(loc=1, column='flare_time', value=df_test['aia_min_start_time'].values)
+    df_new.insert(loc=1, column='flare_time', value=df_test['aia_max_start_time'].values)
     df_test = df_new
 
     df_train = df_train.replace([np.inf, -np.inf, np.nan], 0)
@@ -215,7 +215,7 @@ def main():
     plt.legend(['Training','Test'],fontsize=16)
     plt.tight_layout()
     plt.grid(True)
-    plt.savefig(outdir+'ert_predvstrue_trainvalid_hmi_7.png',dpi=300,bbox_inches='tight')
+    plt.savefig(outdir+'ert_predvstrue_trainvalid_' +config["features"]+'_7.png',dpi=300,bbox_inches='tight')
 
     # plot test data
     plt.figure()

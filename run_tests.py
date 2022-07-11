@@ -5,8 +5,8 @@ import pandas as pd
 import ert_aia_peaks
 import os
 
-features = 'hmi' # can be either 'hmi','hmiandaia' or 'aia'
-seeds = np.arange(1001,11001,1000)
+in_features = 'hmi' # can be either 'hmi','hmiandaia' or 'aia'
+seeds = np.arange(1001,3001,1000)
 data = {'seed':seeds,'RMSE_train':[],'MAE_train':[],'R2_train':[],'L2err_train':[],'RMSE_test':[],'MAE_test':[],'R2_test':[],'L2err_test':[]}
 for seed in seeds:
 
@@ -15,10 +15,10 @@ for seed in seeds:
         config = json.load(jsonfile)
 
     print('Running test with seed ', seed)
-    config['features'] = features
+    config['features'] = in_features
     config["seed"] = int(seed)
     config["labels_file"] = 'aia_flares_catalog_verified.csv'
-    config["output_dir"] = 'ert_results_'+features+'/seed'+str(seed)+'/'
+    config["output_dir"] = 'ert_results_'+str(in_features)+'/seed'+str(seed)+'/'
 
     if not os.path.exists(config["output_dir"]):
         os.makedirs(config["output_dir"])
@@ -43,7 +43,7 @@ for seed in seeds:
             data[feature] = [importance]
 
 df = pd.DataFrame(data)
-df.to_csv(config["output_dir"]+'ert_results_'+features+'_verified.csv',index=False)
+df.to_csv(config["output_dir"]+'ert_results_'+in_features+'_verified.csv',index=False)
 
     
 

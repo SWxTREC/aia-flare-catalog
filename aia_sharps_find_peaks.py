@@ -16,40 +16,36 @@ from multiprocessing import Pool
 import peak2 as peak
 
 if __name__ == '__main__':
+    # load GOES catalog and eliminate irrelevant entries
     flare_catalog = pd.read_csv('goes_catalog_with_noaa_ar2.csv',na_values=' ')
     flare_catalog = flare_catalog.dropna(subset=['SHARP'])
     flares = flare_catalog[pd.to_numeric(flare_catalog['SHARP'])>=20]
     flares.SHARP = pd.to_numeric(flares['SHARP']).astype('int64')
     
-    bhs = pd.read_csv('/home/kiva6588/Code/sharps_badheaders.csv')
+    bhs = pd.read_csv('sharps_badheaders.csv')
     bhs = [x[0] for x in bhs.values]
     flares = flares[~flares.SHARP.isin(bhs)]
 
-    outofrange = pd.read_csv('/home/kiva6588/Code/flares_with_limbs2.csv')
+    outofrange = pd.read_csv('flares_with_limbs2.csv')
     outofrange = [x[0] for x in outofrange.values]
     flares = flares.drop(outofrange,errors='ignore')
 
-    nes_noaa = pd.read_csv('/home/kiva6588/Code/nonempty_sharps_with_noaa_ar.csv')
+    nes_noaa = pd.read_csv('nonempty_sharps_with_noaa_ar.csv')
     flares = flares[flares.SHARP.isin(nes_noaa.HARPNUM)]
     flares = flares.reset_index().rename(columns={'index':'flare_ind'})
 
     lams = ['193','171','304','1600','131','94']
-    # lams = ['94']
     colors = ['tab:blue','tab:orange','tab:green','tab:red','tab:purple','tab:brown']
 
+    # directory of AIA fits files -- just to get list of downloaded SHARPs
     fits_dir = '/srv/data/sdo_sharps/aia_temp'
 
     dirs = os.listdir(fits_dir)
     dirs = sorted(dirs)
-    # args = [(dir,lams) for dir in dirs]
-
-    # with Pool(8) as p:
-    #     p.starmap(peak.generate_peak_data,args)
 
     df = pd.DataFrame()
 
     for sharpd in dirs:
-    # for sharpd in ['sharp_3647']:
         print('Working on ' + sharpd)
         flares_sharp = flares[flares['SHARP']==int(sharpd.split('_')[-1])]
 
@@ -96,7 +92,7 @@ if __name__ == '__main__':
             ax[j].grid()
 
         plt.title(sharpd)
-        plt.savefig('aia_timeseries/'+sharpd+'_aia_timeseries_7.png')
+        plt.savefig('aia_timeseries/'+sharpd+'_aia_timeseries.png')
         plt.close()
 
         if len(peak_data)>0:
@@ -108,7 +104,7 @@ if __name__ == '__main__':
     cols = cols[-1:]+cols[-7:-1]+cols[:-7]
     print(cols)
     df = df[cols]
-    df.to_csv('aia_flares_catalog_7.csv',index=False)
+    df.to_csv('aia_flares_catalog.csv',index=False)
     
 
 

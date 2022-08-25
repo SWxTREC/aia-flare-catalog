@@ -6,22 +6,23 @@ import pandas as pd
 
 
 def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=False):
-    """Detect kinks in the input signal, returning a list of all x locations.
-       Assumes an even grid.  Note that this doesn't handle jumps- these 
-       should probably be found first, and possibly removed, before kink detection.
+    """Detect kinks and peaks in the input signal, returning a list or lists of indices.
        :param x: locations of the signal data points
-       :param signal: data values to detect kinks
+       :param lam: wavelength for selecting peak height and prominence parameters
+       :param signal: data values to detect peaks
        :param thresh: relative scale factor for kink detection
-       :param returninds: flag to return the kink indices, rather than x locations
+       :param positiveonly: flag to detect only positive kinks, true for detecting peaks
+       :param returndiff: returns start, peak and end indices rather than kink indices
     """
     sos = ss.butter(2,0.5,output='sos')
     if len(signal) > 9:
+        # some smoothing of the signal
         signal_smooth = sn.maximum_filter1d(signal,3)
         kernel = ss.cubic([-1.0,0.0,1.0])
         signal_smooth = ss.convolve(signal_smooth,kernel,mode='same',method='auto')
         # signal_smooth = ss.savgol_filter(signal,window_length=5,polyorder=3)
         # signal_smooth = sn.gaussian_filter1d(signal,2.5)
-    #     # signal_smooth = ss.sosfiltfilt(sos,signal)
+        # signal_smooth = ss.sosfiltfilt(sos,signal)
     else:
         signal_smooth = signal
 
@@ -43,9 +44,10 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
     elif lam == '94':
         height = 3e5
         prominence = 1e5
-    # height = 0.0
-    # prominence = np.min([0.2*np.median(signal),0.05*(np.max(signal)-np.median(signal))])
-    # prominence = 0.05*(np.max(signal)-np.median(signal))
+    else:
+        height = 0
+        prominence = 0.05*(np.max(signal)-np.median(signal))
+
     peaks, props = ss.find_peaks(signal_smooth,height=height,prominence=prominence,width=3,rel_height=0.8,distance=5)
     width_heights = props['width_heights']
     left = np.round(props['left_ips']).astype(int)
@@ -65,9 +67,6 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
     else:
         diff = abs(frwd-bkwd)
 
-    # frwd = ss.savgol_filter(signal,window_length=9,polyorder=5,deriv=1)
-    # diff = ss.savgol_filter(signal,window_length=9,polyorder=5,deriv=2)
-    
     # normalize signal and derivatives
     diff /= max(diff)
     # signal /= max(signal)
@@ -88,52 +87,53 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
     if len(dups)>0:
         inds_kinks = np.delete(inds_kinks, dups+1)        
 
-    # If we found kinks, bump the index offset
-    if len(inds_kinks) != 0:
-        inds_kinks = inds_kinks
-
-    # Now find associated peak and discard extra kink values
+    # Now find adjust start point of peaks based on nearest kink 
+    # note that left and right indicate the 80% threshold points on either 
+    # side of the peak obtained from the scipy peak finding routine
     inds_peaks = []
     inds_ends = []
     inds_starts = []
     for i in range(len(peaks)):
         if len(inds_kinks[inds_kinks<=left[i]])>0:
+            # first check for a kink earlier than the given left point of the peak
             ind_start = inds_kinks[np.argmin(abs(left[i]-inds_kinks[inds_kinks<=left[i]]))]
             if x[ind_start]<x[peaks[i]]-60*60:
+                # if that is an hour earlier than the peak, try for the closest kink after the left point
                 ind_start = inds_kinks[np.argmin(abs(left[i]-inds_kinks[inds_kinks<peaks[i]]))]
                 if x[ind_start]<x[peaks[i]]-60*60:
+                    # if that is still an hour earlier, try the closest kink to the peak
                     ind_start = inds_kinks[np.argmin(abs(peaks[i]-inds_kinks[inds_kinks<peaks[i]]))]
                     if x[ind_start]<x[peaks[i]]-60*60:
+                        # if still an hour earlier, just take the left point or 45 minutes before
                         ind_start = np.max([left[i],peaks[i]-45])
         elif len(inds_kinks[inds_kinks<peaks[i]])>0:
+            # if no kinks earlier than the left point, check for the closest after the left point
             ind_start = inds_kinks[np.argmin(abs(left[i]-inds_kinks[inds_kinks<peaks[i]]))]
             if x[ind_start]<x[peaks[i]]-60*60:
+                # still an hour earlier, try the closest kink to the peak
                 ind_start = inds_kinks[np.argmin(abs(peaks[i]-inds_kinks[inds_kinks<peaks[i]]))]
                 if x[ind_start]<x[peaks[i]]-60*60:
+                    # if still an hour earlier, just take the left point or 45 minutes before
                     ind_start = np.max([left[i],peaks[i]-45])
         else:
+            # if no kinks before the peak, just take the left point or 45 minutes before
             ind_start = np.max([left[i],peaks[i]-45])
         if signal[ind_start]>signal[peaks[i]]:
             ind_start = left[i]
         
-        # if len(inds_ends)>0 and inds_ends[-1]<peaks[i]:
-        #     ind_start = np.max([ind_start,inds_ends[-1]])
-        
-        # if ind_start > 4 and np.min(signal[ind_start-4:ind_start])<signal[ind_start]:
-        #     ind_start = ind_start-4+np.argmin(signal[ind_start-4:ind_start])
-        
         prominence = signal[peaks[i]]-signal[ind_start]
 
         if right[i]>peaks[i]+120:
+            # if the given right point is more than 2 hours after the peak, double check with the adjusted prominence
             if i < len(peaks)-1:
                 ind_end = peaks[i]+np.argmin(np.abs(signal[peaks[i]:np.min([peaks[i+1],peaks[i]+120])]-signal[peaks[i]]+0.8*prominence))
             else:
                 ind_end = peaks[i]+np.argmin(np.abs(signal[peaks[i]:np.min([len(signal),peaks[i]+120])]-signal[peaks[i]]+0.8*prominence))
-        # if peaks[i] > 1.1*signalmed[peaks[i]]:
         else:
             ind_end = right[i]
 
         if signal[ind_start]<np.median(signal)/100:
+            # too small to be a peak
             continue
             
         inds_starts.append(ind_start)
@@ -147,6 +147,7 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
         return inds_kinks
 
 def verify_peak(start_time,peak_time,end_time,aia_data,aia_times,lams,starts,peaks,ends,sharp_flare_data):
+    # cross reference a peak across wavelengths
     peak_data = {}
     true_peak_inds = np.nan*np.zeros(len(lams))
         
@@ -184,9 +185,8 @@ def verify_peak(start_time,peak_time,end_time,aia_data,aia_times,lams,starts,pea
 
     # find associated flare from GOES
     flare_data = sharp_flare_data[(sharp_flare_data['STARTTIME']<=end_time) & (sharp_flare_data['ENDTIME']>=start_time)]
-    # choose largest flare
+    # choose closest flare in time
     if len(flare_data)>0:
-        # im = np.argmax(flare_data['INTENSITY'])
         im = np.argmin(abs(flare_data['STARTTIME']-peak_data['aia_mean_peak_time']))
         peak_data['goes_flare_ind'] = int(flare_data['flare_ind'].iloc[im])
         peak_data['CMX'] = flare_data['CMX'].iloc[im]
@@ -217,7 +217,6 @@ def verify_peaks(aia_data,aia_times,lams,starts,peaks,ends,sharp_flare_data):
             end_time = aia_times[j][ends[j][k]]
             peak_data = verify_peak(start_time,peak_time,end_time,aia_data,aia_times,lams,starts,peaks,ends,sharp_flare_data)
             if (len(peak_data)>0) and peak_data['aia_min_start_time'] not in [peak['aia_min_start_time'] for peak in peaks_data] and peak_data['aia_max_end_time'] not in [peak['aia_max_end_time'] for peak in peaks_data]: 
-            # if len(peak_data)>0 and peak_data not in peaks_data:
                 # now we've verified this is a peak and we want to add it to the true peak lists
                 peaks_data.append(peak_data)
 
@@ -253,9 +252,7 @@ def generate_peak_data(aia_data,aia_times,lams,sharp_flare_data):
 
     # then verify and associate them with each other
     peaks_data = verify_peaks(aia_data,aia_times,lams,starts,peaks,ends,sharp_flare_data)
-    
-    # then consolidate any duplicate GOES entries
- 
+     
     df = pd.DataFrame(peaks_data)
     
     return df

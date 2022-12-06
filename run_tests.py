@@ -2,28 +2,30 @@ import json
 from re import L
 import numpy as np
 import pandas as pd
-import ert_aia_peaks
+import ert.ert_aia_peaks as ert_aia_peaks
 import os
 
+### Script to run training and testing of ERT model on different feature sets and random seeds]
+
 in_features = 'hmi' # can be either 'hmi','hmiandaia' or 'aia'
-seeds = np.arange(1001,3001,1000)
+seeds = np.arange(1001,11001,1000)
 data = {'seed':seeds,'RMSE_train':[],'MAE_train':[],'R2_train':[],'L2err_train':[],'RMSE_test':[],'MAE_test':[],'R2_test':[],'L2err_test':[]}
 for seed in seeds:
 
     # first update config file
-    with open('config_regression.json', 'r') as jsonfile:
+    with open('ert/config_regression.json', 'r') as jsonfile:
         config = json.load(jsonfile)
 
     print('Running test with seed ', seed)
     config['features'] = in_features
     config["seed"] = int(seed)
-    config["labels_file"] = 'aia_flares_catalog_verified.csv'
+    config["labels_file"] = 'flare_catalogs/aia_flares_catalog_verified.csv'
     config["output_dir"] = 'ert_results_'+str(in_features)+'/seed'+str(seed)+'/'
 
     if not os.path.exists(config["output_dir"]):
         os.makedirs(config["output_dir"])
 
-    with open('config_regression.json', 'w') as outfile:
+    with open('ert/config_regression.json', 'w') as outfile:
         json.dump(config, outfile)
 
     # then run code

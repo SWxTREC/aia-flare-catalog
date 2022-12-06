@@ -28,22 +28,22 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
 
     if lam == '193':
         height = 2.5e7
-        prominence = 2.5e6
+        prominence = 7e6
     elif lam == '171':
         height = 1.5e7
-        prominence = 9e6
+        prominence = 5e6
     elif lam == '304':
         height = 9e6
-        prominence = 5e6
+        prominence = 9e5
     elif lam == '1600':
         height = 5e6
-        prominence = 2e6
+        prominence = 5e5
     elif lam == '131':
         height = 1e6
         prominence = 2e5
     elif lam == '94':
         height = 3e5
-        prominence = 1e5
+        prominence = 5e4
     else:
         height = 0
         prominence = 0.05*(np.max(signal)-np.median(signal))
@@ -105,7 +105,7 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
                     ind_start = inds_kinks[np.argmin(abs(peaks[i]-inds_kinks[inds_kinks<peaks[i]]))]
                     if x[ind_start]<x[peaks[i]]-60*60:
                         # if still an hour earlier, just take the left point or 45 minutes before
-                        ind_start = np.max([left[i],peaks[i]-45])
+                        ind_start = np.max([left[i],peaks[i]-4])
         elif len(inds_kinks[inds_kinks<peaks[i]])>0:
             # if no kinks earlier than the left point, check for the closest after the left point
             ind_start = inds_kinks[np.argmin(abs(left[i]-inds_kinks[inds_kinks<peaks[i]]))]
@@ -114,21 +114,21 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
                 ind_start = inds_kinks[np.argmin(abs(peaks[i]-inds_kinks[inds_kinks<peaks[i]]))]
                 if x[ind_start]<x[peaks[i]]-60*60:
                     # if still an hour earlier, just take the left point or 45 minutes before
-                    ind_start = np.max([left[i],peaks[i]-45])
+                    ind_start = np.max([left[i],peaks[i]-4])
         else:
             # if no kinks before the peak, just take the left point or 45 minutes before
-            ind_start = np.max([left[i],peaks[i]-45])
+            ind_start = np.max([left[i],peaks[i]-4])
         if signal[ind_start]>signal[peaks[i]]:
             ind_start = left[i]
         
         prominence = signal[peaks[i]]-signal[ind_start]
 
-        if right[i]>peaks[i]+120:
+        if right[i]>peaks[i]+10:
             # if the given right point is more than 2 hours after the peak, double check with the adjusted prominence
             if i < len(peaks)-1:
-                ind_end = peaks[i]+np.argmin(np.abs(signal[peaks[i]:np.min([peaks[i+1],peaks[i]+120])]-signal[peaks[i]]+0.8*prominence))
+                ind_end = peaks[i]+np.argmin(np.abs(signal[peaks[i]:np.min([peaks[i+1],peaks[i]+10])]-signal[peaks[i]]+0.8*prominence))
             else:
-                ind_end = peaks[i]+np.argmin(np.abs(signal[peaks[i]:np.min([len(signal),peaks[i]+120])]-signal[peaks[i]]+0.8*prominence))
+                ind_end = peaks[i]+np.argmin(np.abs(signal[peaks[i]:np.min([len(signal),peaks[i]+10])]-signal[peaks[i]]+0.8*prominence))
         else:
             ind_end = right[i]
 
@@ -168,9 +168,9 @@ def verify_peak(start_time,peak_time,end_time,aia_data,aia_times,lams,starts,pea
             peak_data[lams[l]+'_prominence'] = aia_data[l][np.array(peaks[l])[ind]]-aia_data[l][np.array(starts[l])[ind]]
 
         else: # no peak found so add NaN instead
-            peak_data[lams[l]+'_peak_time'] = np.nan
-            peak_data[lams[l]+'_start_time'] = np.nan
-            peak_data[lams[l]+'_end_time'] = np.nan
+            peak_data[lams[l]+'_peak_time'] = pd.NaT
+            peak_data[lams[l]+'_start_time'] = pd.NaT
+            peak_data[lams[l]+'_end_time'] = pd.NaT
             peak_data[lams[l]+'_magnitude'] = np.nan
             peak_data[lams[l]+'_prominence'] = np.nan
 

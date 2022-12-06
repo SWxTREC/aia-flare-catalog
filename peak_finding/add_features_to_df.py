@@ -73,7 +73,11 @@ def add_location(header_dir,df):
         if (flare_end-flare_start).total_seconds() < 12*60:
             flare_start = flare_end - timedelta(minutes=13)
         print('Flare ',i)
-        file_list = os.listdir(header_dir + os.sep + 'sharp_' + str(int(sharpno)))
+        try:
+            file_list = os.listdir(header_dir + os.sep + 'sharp_' + str(int(sharpno)))
+        except FileNotFoundError:
+            file_list = []
+            
         file_list = [file for file in file_list if len(file.split('.'))>3]
         flare_files = [file for file in file_list if datetime.strptime(file.split('.')[3].strip('_TAI'),'%Y%m%d_%H%M%S')>=flare_start and datetime.strptime(file.split('.')[3].strip('_TAI'),'%Y%m%d_%H%M%S')<=flare_end]
 
@@ -134,11 +138,11 @@ def add_location(header_dir,df):
 
 def main():
 
-    df = pd.read_csv('aia_flares_catalog_7_updated.csv')
+    df = pd.read_csv('../flare_catalogs/aia_flares_catalog_720s_3_updated.csv')
     df = add_location('/srv/data/sdo_sharps/hmi_temp',df)
     # df = add_NxNy(df)
     # df = add_cnn_pred(outdir,df)
-    df.to_csv('aia_flares_catalog_7_updated.csv',index=False)
+    df.to_csv('../flare_catalogs/aia_flares_catalog_720s_updated.csv',index=False)
 
 
 if __name__== "__main__":

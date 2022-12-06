@@ -7,11 +7,6 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import mean_squared_error,mean_absolute_error,r2_score
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from joblib import dump, load
-import h5py
-import time
-import gzip, pickle, pickletools
-import glob,os
-import re
 import random
 from sklearn.model_selection import GridSearchCV
 import json
@@ -37,10 +32,10 @@ def generateTrainValidData(df,config,cols,label_col):
 
     df['flare'] =(((np.log10(df['goes_magnitude']))+6)/3.)    
 
-    flares_C = df['goes_flare_ind'][np.logical_and(df['CMX']=='C',df['CMX_VALUE']>=10)].astype('int64').reset_index(drop=True)
-    flares_M = df['goes_flare_ind'][df['CMX']=='M'].astype('int64').reset_index(drop=True)
-    flares_X = df['goes_flare_ind'][df['CMX']=='X'].astype('int64').reset_index(drop=True)
-    
+    flares_C = df['goes_flare_ind'][np.logical_and(df['CMX']=='C',df['CMX_VALUE']>=10)].unique().astype('int64')
+    flares_M = df['goes_flare_ind'][df['CMX']=='M'].unique().astype('int64')
+    flares_X = df['goes_flare_ind'][df['CMX']=='X'].unique().astype('int64')
+
     random.seed(seed)
     random.shuffle(flares_C)
     random.shuffle(flares_M)
@@ -57,10 +52,10 @@ def generateTrainValidData(df,config,cols,label_col):
     valid_flares_M = flares_M[split_train_M:split_valid_M]
     train_flares_X = flares_X[:split_train_X]
     valid_flares_X = flares_X[split_train_X:split_valid_X]
-    train_flares = train_flares_C.append(train_flares_M).append(train_flares_X)
-    valid_flares = valid_flares_C.append(valid_flares_M).append(valid_flares_X)
-    df_train = df[df['goes_flare_ind'].isin(train_flares.to_numpy())] 
-    df_valid = df[df['goes_flare_ind'].isin(valid_flares.to_numpy())]
+    train_flares = np.concatenate([train_flares_C,train_flares_M,train_flares_X])
+    valid_flares = np.concatenate([valid_flares_C,valid_flares_M,valid_flares_X])
+    df_train = df[df['goes_flare_ind'].isin(train_flares)] 
+    df_valid = df[df['goes_flare_ind'].isin(valid_flares)]
     df_test = df[df['goes_flare_ind'].isnull()].sample(frac=1)
 
     y_train = df_train[label_col]
@@ -91,7 +86,7 @@ def generateTrainValidData(df,config,cols,label_col):
     df_new = pd.DataFrame(data, columns=[x for x in cols])
     df_new.insert(loc=0, column='index', value=df_test.index)
     df_new.insert(loc=1, column='SHARP', value=df_test['SHARP'].values)
-    df_new.insert(loc=2, column='flare_time', value=df_test['aia_min_start_time'].values)
+    df_new.insert(loc=2, column='flare_time', value=df_test['aia_max_start_time'].values)
     # df_new.insert(loc=0, column="filename", value=df_test["filename"].values)
     df_test = df_new
 
@@ -104,6 +99,7 @@ def generateTrainValidData(df,config,cols,label_col):
 
     print('Number of C/M/X flares in training set: ',len(train_flares_C),'/',len(train_flares_M),'/',len(train_flares_X))
     print('Number of C/M/X flares in valid set: ',len(valid_flares_C),'/',len(valid_flares_M),'/',len(valid_flares_X))
+    print(len(df_test))
 
     trainX, trainY = np.array(df_train), np.array(y_train)
     validX, validY = np.array(df_valid), np.array(y_valid)
@@ -117,7 +113,7 @@ def main():
         config = json.load(jsonfile)  
     outdir = config["output_dir"]
 
-    impurity = 0.000025
+    impurity = 0.00004
     df = pd.read_csv(config['labels_file'])
     label_col = 'flare'
     feature_cols = ['LAT_FWT','LON_FWT','AREA_ACR','USFLUXL','MEANGAM','MEANGBT','MEANGBZ','MEANGBH','MEANJZD','TOTUSJZ','MEANALP','MEANJZH','ABSNJZH','SAVNCPP','MEANPOT','TOTPOT','MEANSHR','SHRGT45','R_VALUE','NACR','SIZE_ACR','SIZE']
@@ -126,7 +122,7 @@ def main():
     for lam in lams:
         feature_cols.append(lam+'_magnitude')
         feature_cols.append(lam+'_prominence')
-        # feature_cols.append(lam+'_est_size')
+        feature_cols.append(lam+'_est_size')
         df[lam+'_duration'] = (pd.to_datetime(df[lam+'_end_time'])-pd.to_datetime(df[lam+'_start_time'])).dt.total_seconds()
         feature_cols.append(lam+'_duration')
     # feature_cols.append('Nx')
@@ -143,7 +139,7 @@ def main():
 
     # ralphie = svm.SVR(kernel='rbf',degree=4)
     # model = KNeighborsRegressor()
-    model = ExtraTreesRegressor(200,bootstrap=True,criterion='mae',random_state=1,min_impurity_decrease=impurity)
+    model = ExtraTreesRegressor(100,bootstrap=True,criterion='mae',random_state=1,min_impurity_decrease=impurity)
     model.fit(X[:,3:],y)
     # print(clf.cv_results_)
 
@@ -152,7 +148,7 @@ def main():
 
     print('Results on test set')
     y_test_pred = model.predict(X_test[:,3:])
-    print('Number of unlabelled >=M1 flares:', np.sum(y_test_pred*3-6>=1e-5))
+    print('Number of unlabelled >=M1 flares:', np.sum(10**(y_test_pred*3-6)>=1e-5))
 
     plt.figure()
     plt.plot(y*3-6,y_train_pred*3-6,'.')
@@ -205,7 +201,7 @@ def main():
 
     df['ert_pred_intensity'] = y_pred
     df['ert_pred_CMX'] = cmx
-    df.to_csv('aia_flares_catalog_7_pred.csv',index=False)
+    df.to_csv('../flare_catalogs/aia_flares_catalog_verified_pred_2.csv',index=False)
 
     return 
 

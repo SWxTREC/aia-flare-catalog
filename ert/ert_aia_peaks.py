@@ -41,7 +41,13 @@ def generateTrainValidData(df,config,cols,label_col):
     flares_C = df['goes_flare_ind'][np.logical_and(df['CMX']=='C',df['CMX_VALUE']>=10)].unique().astype('int64')
     flares_M = df['goes_flare_ind'][df['CMX']=='M'].unique().astype('int64')
     flares_X = df['goes_flare_ind'][df['CMX']=='X'].unique().astype('int64')
-    
+    # flares_C = df.reset_index()['index'][np.logical_and(df['CMX']=='C',df['CMX_VALUE']>=10)].unique().astype('int64')
+    # flares_M = df.reset_index()['index'][df['CMX']=='M'].unique().astype('int64')
+    # flares_X = df.reset_index()['index'][df['CMX']=='X'].unique().astype('int64')
+
+    # print(flares_X)
+    # print(df.head())
+
     random.seed(seed)
     random.shuffle(flares_C)
     random.shuffle(flares_M)
@@ -64,9 +70,16 @@ def generateTrainValidData(df,config,cols,label_col):
     df_train = df[df['goes_flare_ind'].isin(train_flares)] 
     df_valid = df[df['goes_flare_ind'].isin(valid_flares)]
     df_test = df[df['goes_flare_ind'].isnull()].sample(frac=1).reset_index(drop=True)
+    # print(train_flares)
+    # df_train = df.loc[train_flares] 
+    # df_valid = df.loc[valid_flares]
+    # df_test = df[df['CMX'].isnull()].sample(frac=1).reset_index(drop=True)
+    # print(df_train.head())
 
     y_train = df_train[label_col]
+    # print(df_train[df_train[label_col].isna()])
     y_valid = df_valid[label_col]
+    # print(df_valid[df_valid[label_col].isna()])
     y_test = df_test[label_col]
     print('Features: ',cols)
     data = df_train[cols].to_numpy()
@@ -96,6 +109,8 @@ def generateTrainValidData(df,config,cols,label_col):
     df_train = df_train.replace([np.inf, -np.inf, np.nan], 0)
     df_valid = df_valid.replace([np.inf, -np.inf, np.nan], 0)
     df_test = df_test.replace([np.inf, -np.inf , np.nan], 0)
+    
+    # print(df_valid.max())
 
     print('Number of C/M/X flares in training set: ',len(train_flares_C),'/',len(train_flares_M),'/',len(train_flares_X))
     print('Number of C/M/X flares in valid set: ',len(valid_flares_C),'/',len(valid_flares_M),'/',len(valid_flares_X))
@@ -160,7 +175,7 @@ def main():
     plt.rc('legend',fontsize=16)
     plt.rc('figure',titlesize=20)
     
-    # plt.figure()
+    plt.figure()
     # plt.plot((np.array(param_grid['n_estimators'])),clf.cv_results_['split0_test_score'])
     # plt.plot((np.array(param_grid['n_estimators'])),clf.cv_results_['split1_test_score'])
     # plt.plot((np.array(param_grid['n_estimators'])),clf.cv_results_['split2_test_score'])
@@ -183,7 +198,7 @@ def main():
     # plt.ylabel('Training score (Negative MSE)',fontsize=16)
     # plt.tight_layout()
     # plt.grid(True)
-    # plt.savefig(outdir+'ert_negMSEvsntrees_cvresults_hmiandaia.png')
+    # plt.savefig(outdir+'ert_negMSEvsimpurity_cvresults.png')
 
     # model = clf.best_estimator_
 
@@ -204,6 +219,12 @@ def main():
     print('Results on test set')
     y_test_pred = model.predict(X_test[:,2:])
 
+    # save data
+    np.save(outdir + '/train_true', np.array(y_train))
+    np.save(outdir + '/train_pred', np.array(y_train_pred))
+    np.save(outdir + '/valid_true', np.array(y_valid))
+    np.save(outdir + '/valid_pred', np.array(y_valid_pred))
+
     plt.figure() 
     plt.plot(y_train*3-6,y_train_pred*3-6,'.')
     plt.plot(y_valid*3-6,y_valid_pred*3-6,'.')
@@ -215,7 +236,7 @@ def main():
     plt.legend(['Training','Test'],fontsize=16)
     plt.tight_layout()
     plt.grid(True)
-    plt.savefig(outdir+'ert_predvstrue_trainvalid_' +config["features"]+'_7.png',dpi=300,bbox_inches='tight')
+    plt.savefig(outdir+'ert_predvstrue_trainvalid_' +str(config["features"])+'_7.png',dpi=300,bbox_inches='tight')
 
     # plot test data
     plt.figure()

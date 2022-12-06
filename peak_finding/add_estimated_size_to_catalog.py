@@ -5,12 +5,11 @@ import pandas as pd
 import numpy as np
 import csv
 from datetime import datetime,timedelta
-import kernels
 from joblib import Parallel, delayed
 
 def add_size(flare_catalog,slot):
     lams = ['193','171','304','1600','131','94']
-    root_dir = '/srv/data/sdo_sharps/hdf5/aia_'
+    root_dir = '/media/faraday/sdo_sharps_new/hdf5_processed/aia_'
 
     flare_sizes = np.zeros((len(flare_catalog),len(lams)))
     flare_intensities = np.zeros((len(flare_catalog),len(lams)))
@@ -47,7 +46,7 @@ def add_size(flare_catalog,slot):
                                 filepath = root_dir+ '_' + str(lams[k])+os.sep+sharpd+os.sep+flare_files[j]
                             Ny,Nx = np.shape(img_data)  
                     except (OSError, KeyError) as e:
-                        # couldn't read a file fosr some reason
+                        # couldn't read a file for some reason
                         continue
             else:
                 file = root_dir+lam +os.sep+sharpd+os.sep + 'aia.sharp_cea_60s.' + str(flare.SHARP)+'.'+flare[lam+'_peak_time'].strftime('%Y%m%d_%H%M%S') +'_TAI.' + lam + '.hdf5'
@@ -72,7 +71,7 @@ def add_size(flare_catalog,slot):
     return flare_catalog
 
 def main():
-    flare_catalog = pd.read_csv('aia_flares_catalog_7.csv')
+    flare_catalog = pd.read_csv('../flare_catalogs/aia_flares_catalog_720s_3_.csv')
     lams = ['193','171','304','1600','131','94']
     flare_catalog['aia_min_start_time'] = pd.to_datetime(flare_catalog['aia_min_start_time'])
     flare_catalog['aia_max_end_time'] = pd.to_datetime(flare_catalog['aia_max_end_time'])
@@ -91,7 +90,7 @@ def main():
     # for i in np.arange(slots.shape[0]-1):
     #     df = pd.concat([df,pd.read_csv('aia_flares_catalog_2_updated_slot'+str(i)+'.csv',ignore_index=True)])
     df = add_size(flare_catalog,0)
-    df.to_csv('aia_flares_catalog_7_updated.csv',index=False)
+    df.to_csv('../flare_catalogs/aia_flares_catalog_720s_3_updated.csv',index=False)
     
 if __name__=="__main__":
 	main()

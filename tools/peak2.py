@@ -6,26 +6,34 @@ import pandas as pd
 
 
 def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=False):
-    """Detect kinks and peaks in the input signal, returning a list or lists of indices.
-       :param x: locations of the signal data points
-       :param lam: wavelength for selecting peak height and prominence parameters
-       :param signal: data values to detect peaks
-       :param thresh: relative scale factor for kink detection
-       :param positiveonly: flag to detect only positive kinks, true for detecting peaks
-       :param returndiff: returns start, peak and end indices rather than kink indices
     """
-    sos = ss.butter(2,0.5,output='sos')
+    Detect kinks and peaks in the input signal, returning a list or lists of indices.
+
+    Args:
+        x (list): locations of the signal data points
+        lam (str): wavelength for selecting peak height and prominence parameters
+        signal (list): data values to detect peaks
+        thresh (float): relative scale factor for kink detection
+        positiveonly (bool): flag to detect only positive kinks, true for detecting peaks
+        returndiff (bool): returns start, peak and end indices rather than kink indices
+    
+    Returns:
+        if returndiff is True:
+            inds_starts (list): indices of starts of peaks
+            inds_peaks (list): indices of peak values
+            inds_ends (list): indices of ends of peaks
+        if returndiff is False:
+            inds_kinks (list): indices of the located kinks
+    """
     if len(signal) > 9:
         # some smoothing of the signal
         signal_smooth = sn.maximum_filter1d(signal,3)
         kernel = ss.cubic([-1.0,0.0,1.0])
         signal_smooth = ss.convolve(signal_smooth,kernel,mode='same',method='auto')
-        # signal_smooth = ss.savgol_filter(signal,window_length=5,polyorder=3)
-        # signal_smooth = sn.gaussian_filter1d(signal,2.5)
-        # signal_smooth = ss.sosfiltfilt(sos,signal)
     else:
         signal_smooth = signal
 
+    # set wavelength dependent parameters for peak-finding
     if lam == '193':
         height = 2.5e7
         prominence = 7e6
@@ -48,6 +56,7 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
         height = 0
         prominence = 0.05*(np.max(signal)-np.median(signal))
 
+    # detect peaks
     peaks, props = ss.find_peaks(signal_smooth,height=height,prominence=prominence,width=3,rel_height=0.8,distance=5)
     width_heights = props['width_heights']
     left = np.round(props['left_ips']).astype(int)
@@ -69,13 +78,8 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
 
     # normalize signal and derivatives
     diff /= max(diff)
-    # signal /= max(signal)
     frwd /= max(abs(frwd))
     bkwd /= max(abs(bkwd))
-
-    # Run a median filter on the difference signal
-    diffmed = ss.medfilt(diff, 11)
-    signalmed = ss.medfilt(signal,121)
 
     # If both positive curvature and positive derivative
     # then we have a kink
@@ -140,14 +144,33 @@ def detect_peaks(x, lam, signal, thresh=0.1, positiveonly=False, returndiff=Fals
         inds_peaks.append(peaks[i])
         inds_ends.append(ind_end)   
 
-
     if returndiff:
         return inds_starts, inds_peaks, inds_ends
     else:
         return inds_kinks
 
 def verify_peak(start_time,peak_time,end_time,aia_data,aia_times,lams,starts,peaks,ends,sharp_flare_data):
-    # cross reference a peak across wavelengths
+    """
+    Cross reference a given peak across wavelengths and to the GOES flare catalog
+
+    Args:
+        start_time (datetime): start time for given peak
+        peak_time (datetime): peak time for given peak
+        end_time (datetime): end time for given peak
+        aia_data (list): AIA timeseries data for each wavelength
+        aia_times (list): corresponding timestamps for AIA data for each wavelength
+        lams (list): wavelengths
+        starts (list): indices of start times for each wavelength 
+        peaks (list): indices of peak times for each wavelength 
+        ends (list): indices of end times for each wavelength
+        sharp_flare_data: GOES flare catalog entries for the given SHARP
+    
+    Returns:
+        peak_data (dict): includes start, peak and end times as well as magnitude and 
+                            prominence for each wavelength, GOES peak data if there is 
+                            a corresponding GOES flare entry
+                            if not a verified peak, this is an empty dict
+    """
     peak_data = {}
     true_peak_inds = np.nan*np.zeros(len(lams))
         
@@ -202,12 +225,27 @@ def verify_peak(start_time,peak_time,end_time,aia_data,aia_times,lams,starts,pea
         peak_data['goes_start_time'] = None
         peak_data['goes_end_time'] = None
 
-    if np.sum(np.isnan(true_peak_inds)) <=2: # corresponds to one of AIA 304,1600,131 not peaking   
+    if np.sum(np.isnan(true_peak_inds)) <=2: # one of AIA 304,1600,131 not peaking   
         return peak_data
     else:
         return {}
 
 def verify_peaks(aia_data,aia_times,lams,starts,peaks,ends,sharp_flare_data):
+    """
+    Cross reference a list of peaks across wavelengths and to the GOES flare catalog
+
+    Args:
+        aia_data (list): AIA timeseries data for each wavelength
+        aia_times (list): corresponding timestamps for AIA data for each wavelength
+        lams (list): wavelengths
+        starts (list): indices of start times for each wavelength 
+        peaks (list): indices of peak times for each wavelength 
+        ends (list): indices of end times for each wavelength
+        sharp_flare_data: GOES flare catalog entries for the given SHARP
+    
+    Returns:
+        peaks_data (list): list of dicts for each peak containing AIA and GOES flare info
+    """    
     peaks_data = []
     # go through the list of peaks for each wavelength and remove entries where the others don't peak
     for j in range(len(lams)-1,1,-1):
@@ -220,11 +258,22 @@ def verify_peaks(aia_data,aia_times,lams,starts,peaks,ends,sharp_flare_data):
                 # now we've verified this is a peak and we want to add it to the true peak lists
                 peaks_data.append(peak_data)
 
-    # go through and trim 
-
     return peaks_data
 
 def generate_peak_data(aia_data,aia_times,lams,sharp_flare_data):
+    """
+    Find and cross-reference peaks in AIA corresponding to flares for a SHARP
+
+    Args:
+        aia_data (list): AIA timeseries data for each wavelength
+        aia_times (list): corresponding timestamps for AIA data for each wavelength
+        lams (list): wavelengths
+        sharp_flare_data: GOES flare catalog entries for the given SHARP
+    
+    Returns:
+        df (dataframe): flare catalog for that SHARP including AIA peak info and 
+                            GOES flare data wherever possible
+    """
     sharp_flare_data['STARTTIME'] = pd.to_datetime('20' + sharp_flare_data['DATE'].astype('str') + '_' + 
                                     sharp_flare_data['START_TIME'].astype('str').str.zfill(4) + '00', format='%Y%m%d_%H%M%S')
     sharp_flare_data['ENDTIME'] = pd.to_datetime('20' + sharp_flare_data['DATE'].astype('str') + '_' + 
